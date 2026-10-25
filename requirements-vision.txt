@@ -1,0 +1,5 @@
+# Image preprocessing and browser tools for Windows, Linux and macOS.
+Pillow>=11,<13
+numpy>=1.26
+playwright>=1.55,<2
+# Install PyTorch/CUDA separately to train multimodal weights.

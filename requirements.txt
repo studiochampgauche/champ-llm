@@ -1,0 +1,5 @@
+# Install the appropriate PyTorch build separately for your operating system and hardware.
+transformers>=4.52,<6
+tokenizers>=0.21,<1
+safetensors>=0.5
+accelerate>=1.3

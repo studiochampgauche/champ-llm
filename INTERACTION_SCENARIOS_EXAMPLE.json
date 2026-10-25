@@ -1,0 +1,9 @@
+{
+  "scenarios": [
+    {
+      "selector": "button[data-testid='open-menu']",
+      "action": "click",
+      "expected_visible": "nav[data-testid='mobile-menu']"
+    }
+  ]
+}
