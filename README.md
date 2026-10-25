@@ -12,7 +12,7 @@ The ambition: a multilingual collaborator that can discuss a brief, write web ap
 
 ## What makes this project interesting?
 
-- **Choose the architecture first.** Preview presets from small experiments to approximately 13B parameters, or define custom dimensions in JSON. Planning works before you have data or a tokenizer.
+- **Choose the architecture first.** Preview the supplied size presets or plan a custom architecture in JSON, including sizes above 13B. Planning works before you have data or a tokenizer.
 - **Start with your own foundations.** Train a byte-level BPE tokenizer and create a Llama-style decoder with random weights.
 - **Keep the whole training path visible.** Prepare bounded shards, pretrain on text and code, then teach conversations with assistant-response masking.
 - **Resume more than the weights.** Checkpoints preserve optimizer state, random-number state and the streaming data cursor.
@@ -89,7 +89,8 @@ python create_model.py --size 7b --plan
 
 Available presets: `20m`, `125m`, `350m`, `1b`, `3b`, `4b`, `7b`, `13b`.
 Names are approximate; the plan reports the count for the selected vocabulary.
-Custom dimensions are supported through `--config`. There is no implicit size.
+Custom architecture planning can exceed 13B through `--config`; 13B is only the
+largest supplied preset. There is no implicit size.
 See [model sizes and resource estimates](docs/MODEL_SIZES.md).
 
 Once dependencies are installed and you have curated a representative corpus:

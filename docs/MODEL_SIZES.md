@@ -5,6 +5,12 @@ preset or custom dimensions before creating weights. Model size controls capacit
 and resource requirements; your datasets and training determine the domains and
 languages learned. A larger model is not a guarantee of better results.
 
+The largest supplied preset is `13b`; custom architecture planning can exceed it.
+Use `--config` to describe larger valid dimensions and `--plan` to estimate their
+parameter count without allocating weights. Planning a size such as 130B does not
+establish working training support: creation currently allocates the complete
+model in memory, and the training scripts do not distribute it across GPUs.
+
 ## Preview without a corpus or tokenizer
 
 ```sh
