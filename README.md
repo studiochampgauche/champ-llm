@@ -1,10 +1,10 @@
 # champ-llm
 
-![champ-llm: a language-model project by the Studio Champ Gauche web agency](docs/assets/banner.svg)
+![champ-llm: Build your own language model. Your model. Your expertise.](docs/assets/banner.svg)
 
 **Choose its size. Train it from scratch. Teach it your domains.**
 
-**champ-llm** is a project developed by **Studio Champ Gauche, a web agency**, to create and train your own Llama-style language models from scratch. Choose a size preset or supply custom architecture dimensions before creating the weights. Its experimental Python codebase brings together dataset preparation, a custom tokenizer, randomly initialized model weights, text training, conversations, visual experiments and a browser-assisted coding loop.
+**champ-llm** is a framework for creating, training and running your own Llama-style language models from scratch. Choose a size preset or supply custom architecture dimensions before creating the weights. Its experimental Python codebase brings together dataset preparation, a custom tokenizer, randomly initialized model weights, text training, conversations, visual experiments and a browser-assisted coding loop.
 
 The ambition: a multilingual collaborator that can discuss a brief, write web applications, inspect their interfaces and improve them. The repository provides the machinery to explore that ambition. Its capabilities still need to be learned and evaluated.
 
