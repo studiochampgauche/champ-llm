@@ -1,8 +1,6 @@
 # Getting started
 
-Use Python 3.13 for the reference setup. Run commands from the project root.
-The repository contains source code and tests. Training data, tokenizers and model
-weights are created locally.
+Use Python 3.13 and run the commands below from the project root.
 
 ## 1. Create an environment
 
@@ -20,93 +18,74 @@ python3.13 -m venv .venv
 source .venv/bin/activate
 ```
 
-Once activated, all commands below use `python`:
+Activate the environment, then check Python and update pip:
 
 ```sh
 python --version
 python -m pip install --upgrade pip
 ```
 
-The version command should report Python 3.13.x. The repository's
-`.python-version` also selects the 3.13 series for tools that read it.
-If the selected interpreter is missing, install Python 3.13 for your operating
-system before creating the environment.
+The version should be Python 3.13.x. Install it for your operating system if needed,
+and create a fresh virtual environment on each computer.
 
-Create a new environment on each computer instead of copying a virtual environment
-between systems. Keep Windows checkout and temporary paths short if long-path
-support is unavailable.
+## 2. Plan your model
 
-## 2. Choose a model size and a first experiment
-
-You can preview the architecture before preparing any corpus or tokenizer:
+Preview a model's parameter count and memory estimates:
 
 ```sh
 python create_model.py --size 7b --plan
 ```
 
-Replace `7b` with `20m`, `125m`, `350m`, `1b`, `3b`, `4b` or `13b` as needed.
-This first preview assumes a 32,768-token vocabulary and creates no files. It does
-not require ML packages. The size is always explicit; there is no default 4B model.
-For custom dimensions and memory estimates, see [Model sizes](docs/MODEL_SIZES.md).
+Choose a preset or define your own dimensions with `--config`. Planning can run
+before you have data, a tokenizer or ML dependencies. Without a tokenizer, it uses
+a provisional 32,768-token vocabulary; rerun the plan after preparing your tokenizer.
+See [Model configuration](docs/MODEL_SIZES.md) for available options and hardware
+requirements.
 
-### Browser integration only — no model or GPU required
+## 3. Install dependencies and check the setup
+
+Install PyTorch using its [official installation selector](https://pytorch.org/get-started/locally/)
+for your operating system and hardware, then install the project dependencies:
 
 ```sh
-python -m pip install -r requirements-vision.txt
+python -m pip install -r requirements.txt -r requirements-vision.txt
+```
+
+A CPU build is sufficient for the small-model integration checks:
+
+```sh
+python test_llama_text_cycle.py
+python test_llama_vision_cycle.py
+python test_direct_llama_backend.py
+```
+
+These checks train and load temporary small models to verify the pipeline.
+
+For website capture and the coding agent, install the browser engines:
+
+```sh
 python -m playwright install chromium firefox webkit
 python -m unittest discover -s tests -p test_real_browser_agent.py -v
 ```
 
-On supported Linux distributions, missing browser libraries can be installed with
-`python -m playwright install --with-deps chromium firefox webkit`. See
-[the browser guide](VISION_AND_BROWSER.md) for executable overrides and the supported
-operating-system requirements.
-
-The browser test covers Chromium, Firefox and WebKit by default. Google Chrome
-can be added when installed; see the browser guide for the test selection variable.
-
-### Tiny model tests and the complete suite
-
-Install PyTorch using its [official installation selector](https://pytorch.org/get-started/locally/)
-for your operating system and hardware. A CPU build is sufficient for the tiny-model
-validation tests. Then install the remaining packages:
-
-```sh
-python -m pip install -r requirements.txt -r requirements-vision.txt
-python -m playwright install chromium firefox webkit
-python test_llama_text_cycle.py
-python test_llama_vision_cycle.py
-python test_direct_llama_backend.py
-python -m unittest discover -s tests -v
-```
-
-The three entry points exercise training, resumption and direct inference on
-temporary tiny models. They do not create or train your chosen production model.
-The complete suite also exercises the real browser; browser failures are not skipped.
-
-For the latest recorded environment, scope and limitations, see
+The browser check can run without a trained model or GPU. See
+[Browser setup](VISION_AND_BROWSER.md) for Google Chrome, Linux system libraries
+and browser selection. Contributors can find the complete test commands in
 [Validation](docs/VALIDATION.md).
 
-## 3. Create your own corpus
+## 4. Prepare your corpus and tokenizer
 
-Git does not preserve empty directories. Create the local input directory:
+Create the input directory:
 
 ```sh
 python -c "from pathlib import Path; Path('training_data').mkdir(exist_ok=True)"
 ```
 
-Add reviewed text, source code and conversation JSONL files under `training_data/`.
-French, English, Spanish and other languages can share the corpus. A root-level
-`training_data.txt` is an optional additional input.
+Add reviewed UTF-8 text, source code and conversation JSONL under `training_data/`.
+A root-level `training_data.txt` is an optional additional input. Keep evaluation
+examples separate. See [Datasets and languages](DATASETS_AND_LANGUAGES.md) for formats.
 
-Both inputs are excluded from Git by default. Keep evaluation data separate from
-training examples. Review data provenance and remove credentials or personal
-information before preparation. See [Datasets and languages](DATASETS_AND_LANGUAGES.md).
-
-Documentation examples and temporary test fixtures are not training inputs.
-Preparation on an empty corpus stops with an explicit error.
-
-## 4. Prepare shards and finalize the tokenizer
+Prepare the data and train the tokenizer:
 
 ```sh
 python prepare_data.py --max-mb 100 --chunk-chars 8192 --shard-mb 32
@@ -114,52 +93,52 @@ python prepare_tokenizer.py --vocab-size 32768
 python create_model.py --size 7b --plan
 ```
 
-Preparation writes manifests and shards under `outputs/`. The tokenizer is stored
-under `model/`. The plan prints an estimate without allocating model weights.
-The initial tokenizer corpus should represent the languages and code you intend
-to teach.
+Prepared shards and manifests are saved under `outputs/`; the tokenizer is saved
+under `model/`. Its training corpus should represent the languages and code you
+want the model to learn.
 
-## 5. Create weights only when ready
+## 5. Create your model
 
-After reviewing the plan with your finalized tokenizer, use the same size choice:
+Once your tokenizer is finalized and the plan fits your resources:
 
 ```sh
 python create_model.py --size 7b --create
 python verify_model.py
 ```
 
-This allocates and saves the chosen randomly initialized parameters. A large model
-requires substantial memory and disk space; creation does not teach it anything.
-The plan reports weights and training tensors separately, excluding activations
-and runtime overhead. Existing model directories cannot be overwritten.
+Creation allocates and saves randomly initialized weights. The model still needs
+training. Memory estimates exclude activations and runtime overhead; see
+[Model configuration](docs/MODEL_SIZES.md) before creating a large model.
 
-A smaller experimental architecture is available after preparing the tokenizer:
+For a smaller first experiment, reuse the tokenizer and choose a separate output:
 
 ```sh
-python create_model.py --size 20m --directory models/20m --plan
-python create_model.py --size 20m --directory models/20m --create
+python create_model.py --size 20m --tokenizer model --directory models/first-experiment --plan
+python create_model.py --size 20m --tokenizer model --directory models/first-experiment --create
+python train_pytorch.py --model models/first-experiment --output training_runs/first-experiment --steps 1 --allow-cpu
 ```
 
-The `20m` profile has approximately 20 million parameters with a 32,768-token vocabulary.
-The finalized tokenizer in `model/` is reused. Use `--tokenizer PATH` to select a
-different local tokenizer. Alternative outputs can live under ignored `models/`;
-pass their path with `--model` when training and `--local-model` in the coding agent.
+The `20m` preset has approximately 20 million parameters with a 32,768-token
+vocabulary. Pass the saved directory with `--model` for training or
+`--local-model` for the coding agent.
 
-## 6. Validate GPU training before scaling up
+## 6. Train and evaluate
 
-Follow [GPU training on RunPod](TRAINING_ON_RUNPOD.md) for initial GPU checks.
-The current training paths use CUDA or explicitly enabled small CPU experiments.
-Apple MPS training is not implemented. Browser portability does not imply GPU
-training support on every device.
+Follow [GPU training](TRAINING_ON_RUNPOD.md) to check CUDA training and checkpoint
+resumption before a longer run. Explicit CPU training is available for models
+with at most 100 million parameters. Apple MPS and distributed multi-GPU training
+are not implemented.
 
-Run short training and checkpoint-resumption checks before extending a run.
-Large-model GPU training and Unsloth integration remain unvalidated at that scale.
+After pretraining, use [conversation training](CONVERSATIONS_CHECKPOINTS_AGENT.md)
+to teach instruction following. Evaluate progress on held-out examples before
+expanding the training run. Large-model GPU training and Unsloth integration
+remain experimental.
 
-## 7. Extend a dataset without replacing its vocabulary
+## 7. Continue with new data
 
-Later datasets can be added and prepared again. Keep the tokenizer fixed after
-model creation. A checkpoint's saved streaming cursor depends on the exact dataset
-snapshot; preserve its manifest and shards for an exact resume.
+You can add datasets and prepare them again while keeping the tokenizer fixed.
+Preserve the original manifest and shards when resuming an existing checkpoint;
+its saved data position depends on that snapshot.
 
-Weights, optimizer checkpoints, data and generated outputs stay outside the public
-source repository. Transfer those artifacts separately when moving a training run.
+Corpora, weights, checkpoints and generated outputs are ignored by Git. Transfer
+them separately when moving a training run to another machine.

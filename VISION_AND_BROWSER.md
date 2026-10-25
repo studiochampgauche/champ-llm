@@ -1,80 +1,84 @@
-# Vision, browser screenshots and feedback
+# Vision and browser
 
-## Choose a browser
+Capture websites in several browsers, inspect responsive behavior, and prepare
+annotated screenshots for visual training.
 
-Install the Playwright-managed engines into your current Python environment:
+## Install browsers
 
 ```sh
 python -m pip install -r requirements-vision.txt
 python -m playwright install chromium firefox webkit
 ```
 
-| CLI choice | Browser actually used |
+On supported Linux distributions, install missing system libraries with:
+
+```sh
+python -m playwright install --with-deps chromium firefox webkit
+```
+
+Playwright provides browser builds for supported Windows, Linux and macOS versions.
+See its [system requirements](https://playwright.dev/python/docs/intro#system-requirements)
+for supported platforms.
+
+## Choose a browser
+
+| Option | Browser used |
 | --- | --- |
-| `--browser chromium` | Playwright's Chromium; the default when no browser is specified |
-| `--browser chrome` | Installed Google Chrome, launched through Playwright's `chrome` channel |
-| `--browser firefox` | Playwright's Firefox build |
-| `--browser webkit` | Playwright's WebKit build |
-| `--browser safari` | Explicit alias for `webkit`; not the installed Safari application |
+| `--browser chromium` | Playwright Chromium; the default |
+| `--browser chrome` | Installed Google Chrome |
+| `--browser firefox` | Playwright Firefox |
+| `--browser webkit` | Playwright WebKit |
+| `--browser safari` | Alias for Playwright WebKit |
 
-Google Chrome must already be installed on the machine. The application does not
-install, replace or update your personal browser. Firefox uses Playwright's build,
-which includes the automation patches required by Playwright.
+Install Google Chrome separately to use `--browser chrome`. Firefox uses
+Playwright's build. The Safari option uses WebKit, not the Safari application;
+test native Safari separately when you need to verify a specific Safari version.
+See [Playwright's browser documentation](https://playwright.dev/python/docs/browsers).
 
-WebKit is the engine used by Safari, but the Playwright build is not a guarantee
-of identical behavior in a released Safari version. WebKit on macOS gives the
-closest platform behavior. See [Playwright's browser documentation](https://playwright.dev/python/docs/browsers).
-The chosen browser is never silently replaced with a different engine on failure.
+## Capture a site
 
-## Capture one or several browsers
+Start the site's development server, then run:
 
 ```sh
 python capture_website.py http://localhost:3000 --project my-site --browser firefox
+```
+
+Repeat `--browser` to capture several browsers:
+
+```sh
 python capture_website.py http://localhost:3000 --project my-site --browser chrome --browser firefox --browser safari
 ```
 
-Repeat `--browser` to inspect several browsers in one command. Duplicate engines
-are inspected once; specifying both `safari` and `webkit` selects WebKit once.
-Each browser uses three viewports: mobile 375, tablet 768 and desktop 1440.
-The same explicit click/fill/press scenarios run in every browser and viewport.
+Each browser is checked at mobile, tablet and desktop widths: 375, 768 and 1440
+pixels. Use `--interactions` with [a scenario file](INTERACTION_SCENARIOS_EXAMPLE.json)
+to exercise clicks, field entry and key presses.
 
-Whole-page and HTML-section screenshots are saved under
-`training_data/vision/<project>/<browser>/`. The browser directory is `webkit`
-for both WebKit and the Safari alias. Screenshots keep their content-hashed names,
-and each `.vision.json` annotation records the image SHA-256 plus
-`browser_metadata` (browser, engine, channel and version). Reviewed annotations
-remain bound to their original screenshot.
+Screenshots and `.vision.json` annotations are saved under
+`training_data/vision/<project>/<browser>/`. Reports are saved under
+`outputs/audits_browser/<project>-<browser>.json`. Both retain the browser identity;
+the Safari alias uses the `webkit` directory.
 
-Technical reports are saved as `outputs/audits_browser/<project>-<browser>.json`.
-This keeps captures and reports from different browsers separate, even when their
-pixels happen to match. Existing captures from older releases are not moved.
-Reports detect technical issues such as JavaScript errors, overflow and missing
-alt text; they do not intrinsically judge visual quality. Use `--allow-external`
-only for sites you are authorized to inspect.
+Reports detect issues such as JavaScript errors, horizontal overflow and missing
+alt text. Use `--allow-external` for an external site you are authorized to inspect.
 
-## Use the same browsers in the development loop
+## Use the coding agent
 
 ```sh
-python coding_agent.py --project ../my-site --url http://localhost:3000 --goal "Fix responsive layout" --browser chrome --browser firefox --browser safari
+python coding_agent.py --project ../my-site --url http://localhost:3000 --goal "Fix the responsive layout" --browser chrome --browser firefox --browser safari
 ```
 
-The selected browsers are checked before and after approved edits. Browser names
-are attached to issues and recorded in the run report. With a trained vision
-backend, up to two screenshots per browser are reviewed, prioritizing mobile and
-desktop. Without vision, the agent still receives the technical browser diagnostics.
-See [the coding-agent guide](DIRECT_AGENT.md) for model setup and `--apply`.
+The agent uses browser diagnostics to propose changes. A trained vision backend
+can also review screenshots. See [the coding-agent guide](DIRECT_AGENT.md) for
+model selection, project tests and applying changes.
 
-## Run the real browser test on Windows, Linux or macOS
-
-Use the same Python environment for installation and testing:
+## Check browser access
 
 ```sh
-python -m playwright install chromium firefox webkit
 python -m unittest discover -s tests -p test_real_browser_agent.py -v
 ```
 
-By default this tests Chromium, Firefox and WebKit. To include installed Google
-Chrome, explicitly select all four browsers for the test run:
+The test uses a temporary local site and real Chromium, Firefox and WebKit
+instances. Model responses are predefined. To include installed Google Chrome:
 
 Windows / PowerShell:
 
@@ -89,67 +93,54 @@ Linux / macOS:
 CHAMP_LLM_TEST_BROWSERS=chromium,chrome,firefox,safari python -m unittest discover -s tests -p test_real_browser_agent.py -v
 ```
 
-The same variable applies to the complete test suite. It can select an individual
-browser for a focused run; the result then validates only that selected browser.
-Missing selected browsers, launch failures or blocked localhost access fail the
-test instead of being skipped. A failed engine is not substituted with Chromium.
+Selected browsers must be installed and able to launch. Missing browsers cause
+a test failure. Use the same Python environment and `PLAYWRIGHT_BROWSERS_PATH`
+for browser installation and execution.
 
-Playwright selects the engine builds for the current supported operating system.
-On supported Linux distributions, install missing system libraries with
-`python -m playwright install --with-deps chromium firefox webkit` (system package
-installation may require administrator privileges). Consult the
-[official system requirements](https://playwright.dev/python/docs/intro#system-requirements).
-A passing run validates the OS where it ran, not untested operating systems.
-
-For a custom compatible Chromium executable, optionally set `CHAMP_LLM_CHROMIUM`.
-The earlier `CHAMP_GAUCHE_LLM_CHROMIUM` and `MONCERVEAU_CHROMIUM` names remain
-fallbacks, in that order. This override applies only to `--browser chromium`;
-it does not redirect Chrome, Firefox or WebKit. If using a custom
-`PLAYWRIGHT_BROWSERS_PATH`, use the same value for installation and execution.
-
-The real browser test starts a temporary local HTTP server, fills a field, presses
-Enter, clicks a button, detects overflow, applies a predefined correction and
-checks the result at all three viewports in each selected browser. It also checks
-section captures, separate browser artifacts, browser metadata and screenshot
-versions. Only model responses are simulated. All site files and captures are
-temporary; they never enter the project's training corpus.
-
-On Windows, keep project and temporary paths short when long-path support is
-unavailable. Deep paths can exceed the Windows limit for screenshot sidecars.
+For a custom compatible Chromium executable, set `CHAMP_LLM_CHROMIUM`.
+On Windows, keep project and temporary paths short if long-path support is unavailable.
 
 ## Annotate screenshots
 
-Edit the sidecar JSON, not the screenshot, after reviewing the screenshot. English metadata keys include `project`, `phase`, `question`, `description`, `critique`, `improvements`, `correction`, and `code_files`. Text values may be written in French. `code_files` entries are relative to `training_data/`. The SHA-256 binding prevents attaching an old critique silently to a changed image.
-
-Example:
+Review each screenshot and edit its matching `.vision.json` file. Text values
+can use the languages in your curriculum. For example:
 
 ```json
 {
-  "project":"my-site",
-  "phase":"before-fix",
-  "question":"Qu'est-ce qui ne va pas avec cette interface ?",
-  "description":"Page d'accueil avec menu et cartes",
-  "critique":"Le contraste du titre est insuffisant",
-  "improvements":"Augmenter le contraste et corriger les espaces",
-  "correction":"Corriger les styles CSS du titre",
-  "code_files":["programming/react/Button.jsx"]
+  "project": "my-site",
+  "phase": "before-fix",
+  "question": "What should be improved in this interface?",
+  "description": "Homepage with navigation and cards",
+  "critique": "The heading has insufficient contrast",
+  "improvements": "Increase contrast and adjust spacing",
+  "correction": "Update the heading's CSS styles",
+  "code_files": ["programming/react/Button.jsx"]
 }
 ```
 
-The actual generated sidecar will also include `image_sha256`; **do not delete or invent this field**. For legacy unhashed annotations, review the image first, then use `bind_annotation.py --image <path> --confirm`.
+Keep the generated `image_sha256` field; it binds the annotation to its screenshot.
+Paths in `code_files` are relative to `training_data/`. To bind an existing
+annotation that has no hash, review the image and run
+`python bind_annotation.py --image <path> --confirm`.
 
-## Prepare the vision dataset
+## Prepare and train on images
 
-```powershell
+```sh
 python prepare_vision.py
-# Or prepare text + vision together:
-python prepare_data.py
 ```
 
-`outputs/vision/vision_manifest.json` points to the visual shards. For GPU vision-training smoke tests:
+This creates `outputs/vision/vision_manifest.json` and its referenced shards.
+`prepare_data.py` can also prepare text and vision together.
 
-```bash
+With the training dependencies and a compatible GPU installed, check one step:
+
+```sh
 python train_vision_pytorch.py --steps 1 --image-size 224 --max-tiles 9
 ```
 
-Train/restore the **same** model and vision checkpoint for inference. The vision module is a prototype with randomly initialized weights; images become meaningful to the model only after significant paired image/text/code training. Whole-page images are tiled, but this does not guarantee all visual detail is preserved. Run real-model integration tests before long GPU sessions.
+Vision training uses additional steps, including with `--resume`. Use matching
+language-model and vision checkpoints for inference.
+
+The vision encoder starts with random weights and requires paired image/text/code
+training. It processes still images, with tiling for larger captures; visual quality
+and animation understanding require separate evaluation.

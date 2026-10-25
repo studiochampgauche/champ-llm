@@ -1,10 +1,15 @@
 # Datasets and languages
 
-Code names, metadata, tooling, files and folders are **English**. This does **not** limit what the model can learn: training text and user messages may be French, English, Spanish, or other languages. Do not translate French conversations into English just to follow the repository naming convention.
+Build your corpus around the languages and domains you want your model to learn.
+Text, code and conversations can be multilingual; use the formats below to prepare them.
 
 ## Raw text and source code
 
-`prepare_data.py` recursively scans `training_data/`, skips sensitive/known generated files, and streams UTF-8 text into bounded shards. It supports nested folders, common web languages and custom UTF-8 text extensions. The corpus starts empty; the following tree is a suggested layout, not bundled training data:
+Place UTF-8 files under `training_data/`. Nested folders help organize languages,
+topics and projects. You can also use a root-level `training_data.txt`; both inputs
+are read during preparation.
+
+For example:
 
 ```text
 training_data/
@@ -17,26 +22,53 @@ training_data/
 └── conversations/questions.jsonl
 ```
 
-File examples are rendered with English labels such as `Path:`, `Language:`, `Extension:`, `Section:`, `Part:`, and `Content:` so the model can learn file context as well as code syntax. A filename is metadata, not magical knowledge; the model must learn how to use it.
+`prepare_data.py` scans these inputs, filters known generated or sensitive files,
+and writes bounded shards. Source-file records include path and language metadata
+alongside their content. See [Getting started](GETTING_STARTED.md) for preparation
+and tokenizer commands.
 
-## Conversation SFT format
+For larger French/English collections assembled from multiple sources, see
+[Corpus preparation](CORPUS_PIPELINE.md).
 
-One JSON object per line, with English **keys** and any language in **content**:
+## Conversation format
+
+Use JSONL: one JSON object per line, with a `messages` array. Each message has a
+`role` and `content`. Supported roles are `system`, `user`, `assistant` and `tool`.
+Content can use any language your model is being trained to handle.
 
 ```json
 {"messages":[{"role":"user","content":"Explique les variables PHP."},{"role":"assistant","content":"En PHP, les variables commencent par $."}]}
 ```
 
-Optional `"learn": false` on an assistant message masks that response from supervised training, while keeping it in the conversation context. The old `"apprendre"` key is not the new schema: update your data before using it. Supported roles include `system`, `user`, `assistant`, `tool`.
+Conversation training learns from assistant responses. Set `"learn": false` on
+an assistant message to keep it as context while excluding that response from
+the training loss.
+
+See [Conversations and checkpoints](CONVERSATIONS_CHECKPOINTS_AGENT.md) for training
+and resumption.
 
 ## Images and code
 
-Use `capture_website.py` to generate versioned PNG screenshots and `.vision.json` sidecars. Each annotation is bound by SHA-256 to its exact screenshot. Fill in `description`, `critique`, `improvements`, `correction`, and `code_files` before training. Training image paths must resolve inside `training_data/`. The visual dataset is separate from text-only pretraining.
+Use `capture_website.py` to generate PNG screenshots and matching `.vision.json`
+annotation files. Review each screenshot and fill in `description`, `critique`,
+`improvements`, `correction` and `code_files`.
 
-## Safety, evaluation and reproducibility
+Image paths and referenced code files must resolve inside `training_data/`.
+Each annotation includes the screenshot's hash so it stays associated with the
+correct image. See [Vision and browser](VISION_AND_BROWSER.md) for the complete
+annotation format and preparation commands.
 
-- Review any code you ingest; remove secrets, personal information, and unlicensed/proprietary training material.
-- The preparer scans for common secrets, but **cannot guarantee** that secrets are excluded.
-- Train/validation partitioning is by document or conversation; keep a truly held-out evaluation set for long-term comparisons.
-- The shard manifest represents one dataset snapshot. A checkpoint's saved shard cursor is only resumable if the same dataset snapshot is retained.
-- Do not interpret decreasing training loss as proof the model can reason, code securely, or evaluate design aesthetics.
+## Dataset quality
+
+Keep evaluation examples separate from training data, including closely related
+documents and conversations. Review provenance, applicable licenses, factual
+quality and code correctness before adding material. Automated secret filters
+assist review but cannot detect every credential or piece of personal information.
+
+Measure progress on held-out tasks as well as training loss. Preserve the prepared
+manifest and shards for any run you may need to resume; its saved data position
+depends on that dataset snapshot.
+
+Keep the tokenizer fixed once model training starts. New datasets can be prepared
+with the existing tokenizer. Training data and generated artifacts are ignored by
+Git by default.

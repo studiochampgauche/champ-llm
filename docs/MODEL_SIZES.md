@@ -1,36 +1,32 @@
-# Choose your model size
+# Model configuration
 
-`champ-llm` creates randomly initialized Llama-style decoders. Select a
-preset or custom dimensions before creating weights. Model size controls capacity
-and resource requirements; your datasets and training determine the domains and
-languages learned. A larger model is not a guarantee of better results.
+Choose a model size that fits your goals, dataset and hardware. Use a preset for
+a quick start or define custom architecture dimensions in JSON. The parameter
+count follows from those dimensions and the tokenizer's vocabulary.
 
-The largest supplied preset is `13b`; custom architecture planning can exceed it.
-Use `--config` to describe larger valid dimensions and `--plan` to estimate their
-parameter count without allocating weights. Planning a size such as 130B does not
-establish working training support: creation currently allocates the complete
-model in memory, and the training scripts do not distribute it across GPUs.
+champ-llm creates Llama-style decoders with randomly initialized weights.
+Training determines the languages and domains the model learns.
 
-## Preview without a corpus or tokenizer
+## Preview a model
 
 ```sh
 python create_model.py --size 7b --plan
 python create_model.py --size 1b --plan --vocab-size 48000
 ```
 
-Planning without a local tokenizer uses a provisional vocabulary of 32,768 tokens,
-or the supplied `--vocab-size`. This path uses only the Python standard library and
-creates no files or weights. If a local tokenizer exists, omit `--vocab-size` to
-count its actual vocabulary instead. Recheck the plan after finalizing the tokenizer.
+Planning reports parameter counts and memory estimates without allocating weights
+or writing files. Before a tokenizer exists, it uses a provisional vocabulary of
+32,768 tokens or the supplied `--vocab-size`. Omit that option to use an existing
+local tokenizer's vocabulary.
 
-## Presets
+Recheck the plan after finalizing the tokenizer.
 
-Counts below assume 32,768 tokens and untied input/output embeddings. Preset
-names are approximate, and their dimensions are fixed. Changing vocabulary size
-changes the count, not the preset's number of layers. These are experimental local
-configurations, not pretrained vendor models or claims about model quality.
+## Presets and memory estimates
 
-| Preset | Text parameters | BF16 weights alone | FP32 PyTorch training tensors alone |
+Preset names are approximate. These counts assume 32,768 tokens; changing the
+vocabulary changes the parameter count while keeping the preset's layers unchanged.
+
+| Preset | Text parameters | BF16 weights | FP32 training tensors |
 | --- | ---: | ---: | ---: |
 | `20m` | 19,925,248 | 0.04 GB | 0.32 GB |
 | `125m` | 128,206,080 | 0.26 GB | 2.05 GB |
@@ -41,29 +37,31 @@ configurations, not pretrained vendor models or claims about model quality.
 | `7b` | 7,002,705,920 | 14.01 GB | 112.04 GB |
 | `13b` | 12,997,575,680 | 26.00 GB | 207.96 GB |
 
-The last column covers FP32 weights, gradients and two AdamW states (16 bytes per
-parameter). Activations, temporary tensors and runtime overhead are additional.
-Unsloth's optimizer and precision choices have different requirements. Neither
-column is a total VRAM requirement or a guarantee that training will fit.
-The optional vision encoder adds parameters that are not included in this table.
-The current training scripts do not distribute a model across multiple GPUs.
+BF16 weights use 2 bytes per parameter. The FP32 column covers weights, gradients
+and two AdamW states at 16 bytes per parameter. Both columns exclude activations,
+temporary tensors and runtime overhead, so they are not total memory requirements.
+Vision parameters are additional, and Unsloth's precision and optimizer choices
+can change memory use.
 
-## Create the chosen model
+Model creation allocates the entire model in memory. The training scripts use a
+single device and do not distribute a model across GPUs. Check available RAM,
+VRAM and disk space, then validate a short run before committing to longer training.
+
+## Create the model
 
 Prepare your corpus and tokenizer using [Getting started](../GETTING_STARTED.md),
-then review and create the same architecture:
+then review and create the selected architecture:
 
 ```sh
 python create_model.py --size 7b --plan
 python create_model.py --size 7b --create
 ```
 
-Both `--plan` and `--create` require exactly one of `--size` or `--config`.
-There is no implicit size and no automatic training. Creation uses the actual
-local tokenizer; `--vocab-size` is available only for a provisional plan.
-The saved `model_identity.json` records the profile, dimensions and actual count.
+Select exactly one of `--size` or `--config` with either action. Creation uses the
+finalized tokenizer; `--vocab-size` is only for provisional plans.
+The output includes `model_identity.json` with the model's dimensions and count.
 
-For a small experiment in a separate directory, reusing the finalized tokenizer:
+For a small experiment in a separate directory:
 
 ```sh
 python create_model.py --size 20m --tokenizer model --directory models/first-experiment --plan
@@ -71,51 +69,47 @@ python create_model.py --size 20m --tokenizer model --directory models/first-exp
 python train_pytorch.py --model models/first-experiment --output training_runs/first-experiment --steps 1 --allow-cpu
 ```
 
-`models/`, `model/` and `training_runs/` are ignored by Git.
-A model outside those directories needs equivalent ignore rules for its tokenizer
-and metadata. The `20m` preset uses the same creation and training pipeline as
-the larger presets. The repository includes no training data.
+CPU training is limited to models with at most 100 million parameters.
 
 ## Custom dimensions
 
-Start from [the small architecture example](../configs/model-small.example.json):
+Copy and edit [the architecture example](../configs/model-small.example.json), then
+pass your configuration:
 
 ```sh
 python create_model.py --config configs/model-small.example.json --plan
 python create_model.py --config configs/model-small.example.json --create
 ```
 
-The JSON schema has five required positive integer fields:
+The JSON schema requires five positive integers:
 
-- `hidden_size`: width of the decoder.
-- `intermediate_size`: width of its feed-forward layers.
-- `num_hidden_layers`: number of decoder blocks.
-- `num_attention_heads`: query attention heads.
-- `num_key_value_heads`: key/value attention heads.
+| Field | Meaning |
+| --- | --- |
+| `hidden_size` | Width of the decoder |
+| `intermediate_size` | Width of the feed-forward layers |
+| `num_hidden_layers` | Number of decoder blocks |
+| `num_attention_heads` | Number of query attention heads |
+| `num_key_value_heads` | Number of key/value attention heads |
 
 `max_position_embeddings` is optional and defaults to 4096. The hidden size must
-be divisible by the attention head count, the head count must be divisible by the
-key/value head count, and each head dimension must be even. Unknown fields and
-invalid dimensions are rejected before allocation. This is an architecture input
-file, not an arbitrary Hugging Face checkpoint configuration.
+be divisible by the attention head count, the attention head count must be divisible
+by the key/value head count, and each head dimension must be even.
 
-The count is derived from these dimensions and the vocabulary; it is not an
-independent setting. The implementation fixes untied embeddings, bias-free
-attention/MLP layers, SiLU and standard rotary embeddings. Valid dimensions do not
-establish training quality, hardware fit or Unsloth compatibility.
+Custom dimensions let you choose sizes beyond the supplied presets, subject to
+these architecture rules and available resources. The resulting parameter count
+also depends on vocabulary size. The architecture uses separate input/output
+embeddings, bias-free attention and feed-forward layers, SiLU and rotary embeddings.
 
-## Keep each model and training run separate
+## Keep experiments separate
 
-Existing model weights cannot be overwritten by `--create`. To try another size,
-choose another output directory and training run. A separate output must be empty;
-the source tokenizer is read and saved into the new model without changing its IDs.
+To try another size, use a new model directory and training run. `--create`
+protects existing weights, and a separate output directory must be empty.
+The source tokenizer is copied without changing its token IDs.
 
-Changing a size flag does not resize an existing trained model. A new architecture
-needs its own weights and training. Resuming a checkpoint reloads its saved
-architecture, optimizer, RNG and data cursor; it does not apply another size choice.
-A vision adapter also remains tied to the language model's hidden dimension.
+A new architecture needs new weights and training. Resuming a checkpoint uses
+its saved architecture and training state. A vision adapter must match the language
+model's hidden dimension.
 
-The presets' parameter counts are checked against actual Llama tensor shapes on
-PyTorch's `meta` device without allocating large weights. Real creation, weight
-updates, resumption and inference are exercised on tiny custom models. See
-[Validation](VALIDATION.md) for the scope of the latest run.
+`model/`, `models/` and `training_runs/` are ignored by Git. Add equivalent ignore
+rules if you store artifacts elsewhere. See [Validation](VALIDATION.md) for model
+creation and training test coverage.

@@ -1,40 +1,50 @@
 # Direct local coding agent
 
-The agent can call your **trained** `champ-llm` weights through `local_backend.py` instead of Ollama. A trained, compatible vision checkpoint can provide additional visual critiques. An untrained model will not produce reliable code or design feedback.
+Use a trained local model to inspect a running website, propose code changes and
+check them with browser diagnostics and your project's tests. A compatible trained
+vision checkpoint can add feedback on screenshots. You can also use an Ollama backend.
 
-## Preview without writing files
+## Preview changes
 
-Start your development server separately (for example at `http://localhost:3000`), then:
+Start your development server, then point the agent at the project and model:
 
 ```sh
-python coding_agent.py --project ../my-site --url http://localhost:3000 --goal "Améliore ce site sans casser le responsive" --backend local --local-model model
+python coding_agent.py --project ../my-site --url http://localhost:3000 --goal "Improve the mobile layout" --backend local --local-model model
 ```
 
-The command-line flags, JSON keys, and programming identifiers are English. **Your goal can still be in French.** The agent prompt asks the model to respond in the goal's language and to use English code identifiers.
+Write the goal in a language your model understands. The command previews proposed
+changes; add `--apply` when you want the agent to write them.
 
 ## Choose browsers
 
-The agent defaults to Chromium. Select a different browser or repeat `--browser`
-to compare several engines before and after edits:
+The default is Chromium. Repeat `--browser` to inspect several browsers:
 
 ```sh
-python coding_agent.py --project ../my-site --url http://localhost:3000 --goal "Corrige le responsive" --backend local --local-model model --browser chrome --browser firefox --browser safari
+python coding_agent.py --project ../my-site --url http://localhost:3000 --goal "Improve the mobile layout" --backend local --local-model model --browser chrome --browser firefox --browser safari
 ```
 
-Chrome uses your installed Google Chrome. Firefox uses Playwright's Firefox build.
-`safari` is an explicit alias for Playwright WebKit; it does not launch Safari.
-Missing selected browsers cause an error, with no fallback to another engine.
-Issues and visual critiques retain their browser identity. See
-[installation and browser tests](VISION_AND_BROWSER.md).
+Chrome uses installed Google Chrome. Firefox uses Playwright's Firefox build.
+`safari` selects Playwright WebKit, rather than the Safari application.
+Install the selected browsers using the [browser setup guide](VISION_AND_BROWSER.md).
 
-## Apply authorized edits
+## Apply changes and run tests
 
-After checking its proposals, explicitly opt in to file writes:
+Work in a separate Git branch or worktree so changes are easy to inspect and undo.
+After reviewing a preview, allow file changes and supply your project's test command:
 
 ```sh
-python coding_agent.py --project ../my-site --url http://localhost:3000 --goal "Corrige le menu mobile" --backend local --local-model model --tests "npm run build" --apply
+python coding_agent.py --project ../my-site --url http://localhost:3000 --goal "Fix the mobile menu" --backend local --local-model model --tests "npm run build" --apply
 ```
 
-Use a Git worktree, disposable development environment and backups. The AI cannot safely be granted arbitrary shell or production-server access. The browser supports local URLs by default and explicit click/fill/press interaction scenarios in `INTERACTION_SCENARIOS_EXAMPLE.json`. An optional Ollama backend is provided for testing the agent before training your own model.
+The agent checks the selected browsers before and after edits. Use `--interactions`
+with a scenario file to exercise clicks, field entry and key presses; see
+[the interaction example](INTERACTION_SCENARIOS_EXAMPLE.json).
 
-This is an **experimental agent framework**, not a production autonomous developer. Model quality, design judgment, code correctness and security must be validated separately. The current agent only uses screenshots with a trained vision module; it cannot learn from its runtime failures unless those corrections are later recorded and fed back into training.
+## Model requirements
+
+Use trained weights for coding tasks. Visual feedback additionally requires a
+trained, compatible vision module. The framework is experimental: review the
+resulting code and evaluate it with your own tests.
+
+The agent does not update model weights during use. Save reviewed corrections
+for a later training cycle if you want the model to learn from them.
