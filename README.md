@@ -1,6 +1,6 @@
 # champ-llm
 
-![champ-llm: Build your own language model. Your model. Your expertise.](docs/assets/banner.svg)
+![champ-llm: Build your own language model. Your model. Your expertise.](docs/assets/banner.svg?v=2)
 
 **Choose its size. Train it from scratch. Teach it your domains.**
 
